@@ -6,50 +6,91 @@
     <title>회원관리 시스템</title>
     <style>
         :root { --primary: #4a90e2; --bg: #f5f7fa; --danger: #e74c3c; --success: #27ae60; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); display: flex; justify-content: center; padding: 20px; }
-        .container { width: 100%; max-width: 500px; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        h2 { text-align: center; color: #333; margin-bottom: 20px; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); display: flex; justify-content: center; padding: 20px; margin: 0; }
         
-        .search-box { display: flex; gap: 10px; margin-bottom: 20px; }
-        input[type="text"], input[type="email"] { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 6px; }
-        .btn-add { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; }
+        /* 메인 컨테이너: 높이를 내부 콘텐츠에 맞춤 */
+        .container { 
+            width: 100%; 
+            max-width: 450px; 
+            background: white; 
+            padding: 20px; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            max-height: 90vh; /* 화면을 벗어나지 않게 설정 */
+        }
 
-        .member-list { list-style: none; padding: 0; }
-        .member-item { background: #fff; border-bottom: 1px solid #eee; padding: 12px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: background 0.2s; }
-        .member-item:hover { background: #f0f4f8; }
+        h2 { text-align: center; color: #333; margin-top: 0; margin-bottom: 20px; }
+        
+        /* 상단 고정 영역 */
+        .search-box { display: flex; gap: 8px; margin-bottom: 15px; flex-shrink: 0; }
+        input[type="text"], input[type="email"] { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
+        .btn-add { background: var(--primary); color: white; border: none; padding: 0 20px; border-radius: 8px; cursor: pointer; font-weight: bold; }
+
+        /* 목록 스크롤 영역 (핵심 수정 부분) */
+        .member-list-wrapper {
+            overflow-y: auto; /* 6개 넘으면 스크롤 생성 */
+            max-height: 340px; /* 항목당 약 56px * 6개 = 336px 내외 */
+            border: 1px solid #eee;
+            border-radius: 8px;
+        }
+        .member-list { list-style: none; padding: 0; margin: 0; }
+        .member-item { 
+            background: #fff; 
+            border-bottom: 1px solid #eee; 
+            padding: 12px 15px; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            cursor: pointer; 
+        }
+        .member-item:last-child { border-bottom: none; }
+        .member-item:hover { background: #f8fbff; }
         .member-info { display: flex; flex-direction: column; pointer-events: none; }
-        .member-name { font-weight: bold; color: #2c3e50; }
-        .member-email { font-size: 0.85rem; color: #7f8c8d; }
+        .member-name { font-weight: bold; color: #2c3e50; font-size: 15px; }
+        .member-email { font-size: 13px; color: #7f8c8d; margin-top: 2px; }
 
+        /* 모달 스타일 */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 1000; }
-        .modal-content { background: white; padding: 25px; border-radius: 10px; width: 90%; max-width: 350px; }
-        .modal-content input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
-        .modal-buttons { display: flex; justify-content: space-between; margin-top: 15px; }
-        .right-btns { display: flex; gap: 5px; }
+        .modal-content { background: white; padding: 25px; border-radius: 12px; width: 85%; max-width: 320px; }
+        .modal-content input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+        .modal-buttons { display: flex; justify-content: space-between; margin-top: 20px; }
+        .right-btns { display: flex; gap: 8px; }
         
-        button { padding: 8px 12px; border-radius: 4px; border: none; cursor: pointer; color: white; }
+        button { padding: 10px 15px; border-radius: 6px; border: none; cursor: pointer; color: white; font-weight: 500; }
         .btn-save { background: var(--success); }
         .btn-delete { background: var(--danger); }
         .btn-close { background: #95a5a6; }
+
+        /* 스크롤바 디자인 (선택사항) */
+        .member-list-wrapper::-webkit-scrollbar { width: 6px; }
+        .member-list-wrapper::-webkit-scrollbar-thumb { background: #ccc; border-radius: 10px; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <h2>회원관리</h2>
+    
+    <!-- 상단 고정: 검색 및 추가 -->
     <div class="search-box">
         <input type="text" id="searchInput" placeholder="회원 이름 검색..." oninput="filterMembers()">
         <button class="btn-add" onclick="openModal('create')">추가</button>
     </div>
-    <div id="loading" style="text-align:center; color: #888;">데이터 불러오는 중...</div>
-    <ul id="memberList" class="member-list"></ul>
+
+    <!-- 스크롤 가능한 목록 영역 -->
+    <div class="member-list-wrapper">
+        <div id="loading" style="text-align:center; padding: 20px; color: #888;">데이터 불러오는 중...</div>
+        <ul id="memberList" class="member-list"></ul>
+    </div>
 </div>
 
-<!-- 통합 모달창 (추가/수정/삭제 겸용) -->
+<!-- 모달 (동일) -->
 <div id="memberModal" class="modal">
     <div class="modal-content">
-        <h3 id="modalTitle">회원 정보</h3>
-        <input type="hidden" id="targetId"> <!-- 수정/삭제용 ID 저장 (숨김) -->
+        <h3 id="modalTitle" style="margin-top:0">회원 정보</h3>
+        <input type="hidden" id="targetId">
         <input type="text" id="newName" placeholder="이름 입력">
         <input type="email" id="newEmail" placeholder="이메일 입력">
         
@@ -68,10 +109,14 @@
     let allMembers = [];
 
     async function loadMembers() {
-        const response = await fetch(API_URL);
-        allMembers = await response.json();
-        displayMembers(allMembers);
-        document.getElementById('loading').style.display = 'none';
+        try {
+            const response = await fetch(API_URL);
+            allMembers = await response.json();
+            displayMembers(allMembers);
+            document.getElementById('loading').style.display = 'none';
+        } catch (e) {
+            document.getElementById('loading').innerText = "데이터 로드 실패";
+        }
     }
 
     function displayMembers(members) {
@@ -82,6 +127,7 @@
                     <span class="member-name">${m.name}</span>
                     <span class="member-email">${m.email}</span>
                 </div>
+                <span style="color:#ccc; font-size:12px;">▶</span>
             </li>
         `).join('');
     }
@@ -92,12 +138,8 @@
         displayMembers(filtered);
     }
 
-    // 모달 열기 (모드에 따라 UI 변경)
     function openModal(mode, id = '', name = '', email = '') {
         const modal = document.getElementById('memberModal');
-        const title = document.getElementById('modalTitle');
-        const saveBtn = document.getElementById('saveBtn');
-        const deleteBtn = document.getElementById('deleteBtn');
         const searchInputVal = document.getElementById('searchInput').value;
 
         document.getElementById('targetId').value = id;
@@ -105,51 +147,38 @@
         document.getElementById('newEmail').value = email;
 
         if (mode === 'create') {
-            title.innerText = "새 회원 등록";
-            saveBtn.innerText = "추가";
-            saveBtn.onclick = () => sendData('create');
-            deleteBtn.style.display = "none";
+            document.getElementById('modalTitle').innerText = "새 회원 등록";
+            document.getElementById('saveBtn').innerText = "추가";
+            document.getElementById('deleteBtn').style.display = "none";
         } else {
-            title.innerText = "회원 정보 수정";
-            saveBtn.innerText = "수정";
-            saveBtn.onclick = () => sendData('update');
-            deleteBtn.style.display = "block";
+            document.getElementById('modalTitle').innerText = "회원 정보 수정";
+            document.getElementById('saveBtn').innerText = "수정";
+            document.getElementById('deleteBtn').style.display = "block";
         }
-
         modal.style.display = 'flex';
-        // 이름이 있으면 이메일에 포커스, 없으면 이름에 포커스
-        document.getElementById(document.getElementById('newName').value ? 'newEmail' : 'newName').focus();
     }
 
-    function closeModal() {
-        document.getElementById('memberModal').style.display = 'none';
-    }
+    function closeModal() { document.getElementById('memberModal').style.display = 'none'; }
 
-    // 데이터 전송 처리 (추가/수정/삭제 통합)
     async function sendData(action) {
         if (action === 'delete' && !confirm("정말 삭제하시겠습니까?")) return;
-
         const payload = {
             action: action,
             id: document.getElementById('targetId').value,
             name: document.getElementById('newName').value,
             email: document.getElementById('newEmail').value
         };
-
+        
         const btn = event.target;
-        const originalText = btn.innerText;
-        btn.innerText = "처리 중...";
         btn.disabled = true;
-
+        
         try {
-            const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) });
-            alert(await res.text());
+            await fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) });
             closeModal();
             loadMembers();
         } catch (e) {
-            alert("통신 오류가 발생했습니다.");
+            alert("처리 중 오류 발생");
         } finally {
-            btn.innerText = originalText;
             btn.disabled = false;
         }
     }
