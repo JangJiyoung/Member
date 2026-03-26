@@ -5,81 +5,79 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>회원관리 시스템</title>
     <style>
-        :root { --primary: #4a90e2; --bg: #f5f7fa; }
+        :root { --primary: #4a90e2; --bg: #f5f7fa; --danger: #e74c3c; --success: #27ae60; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); display: flex; justify-content: center; padding: 20px; }
         .container { width: 100%; max-width: 500px; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         h2 { text-align: center; color: #333; margin-bottom: 20px; }
         
-        /* 검색 영역 */
         .search-box { display: flex; gap: 10px; margin-bottom: 20px; }
-        input[type="text"] { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 6px; }
+        input[type="text"], input[type="email"] { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 6px; }
         .btn-add { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; }
 
-        /* 리스트 영역 */
         .member-list { list-style: none; padding: 0; }
-        .member-item { background: #fff; border-bottom: 1px solid #eee; padding: 12px; display: flex; justify-content: space-between; align-items: center; }
-        .member-info { display: flex; flex-direction: column; }
+        .member-item { background: #fff; border-bottom: 1px solid #eee; padding: 12px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: background 0.2s; }
+        .member-item:hover { background: #f0f4f8; }
+        .member-info { display: flex; flex-direction: column; pointer-events: none; }
         .member-name { font-weight: bold; color: #2c3e50; }
         .member-email { font-size: 0.85rem; color: #7f8c8d; }
 
-        /* 모달 스타일 */
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 1000; }
         .modal-content { background: white; padding: 25px; border-radius: 10px; width: 90%; max-width: 350px; }
-        .modal-content h3 { margin-top: 0; }
         .modal-content input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
-        .modal-buttons { display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px; }
-        .btn-save { background: #27ae60; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; }
-        .btn-close { background: #95a5a6; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; }
+        .modal-buttons { display: flex; justify-content: space-between; margin-top: 15px; }
+        .right-btns { display: flex; gap: 5px; }
+        
+        button { padding: 8px 12px; border-radius: 4px; border: none; cursor: pointer; color: white; }
+        .btn-save { background: var(--success); }
+        .btn-delete { background: var(--danger); }
+        .btn-close { background: #95a5a6; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <h2>회원관리</h2>
-    
     <div class="search-box">
         <input type="text" id="searchInput" placeholder="회원 이름 검색..." oninput="filterMembers()">
-        <button class="btn-add" onclick="openModal()">추가</button>
+        <button class="btn-add" onclick="openModal('create')">추가</button>
     </div>
-
     <div id="loading" style="text-align:center; color: #888;">데이터 불러오는 중...</div>
     <ul id="memberList" class="member-list"></ul>
 </div>
 
-<!-- 추가 모달창 -->
-<div id="addModal" class="modal">
+<!-- 통합 모달창 (추가/수정/삭제 겸용) -->
+<div id="memberModal" class="modal">
     <div class="modal-content">
-        <h3>새 회원 등록</h3>
+        <h3 id="modalTitle">회원 정보</h3>
+        <input type="hidden" id="targetId"> <!-- 수정/삭제용 ID 저장 (숨김) -->
         <input type="text" id="newName" placeholder="이름 입력">
         <input type="email" id="newEmail" placeholder="이메일 입력">
+        
         <div class="modal-buttons">
-            <button class="btn-save" onclick="saveMember()">추가</button>
-            <button class="btn-close" onclick="closeModal()">취소</button>
+            <button class="btn-delete" id="deleteBtn" onclick="sendData('delete')" style="display:none;">삭제</button>
+            <div class="right-btns">
+                <button class="btn-close" onclick="closeModal()">취소</button>
+                <button class="btn-save" id="saveBtn" onclick="sendData('create')">저장</button>
+            </div>
         </div>
     </div>
 </div>
 
 <script>
     const API_URL = "https://script.google.com/macros/s/AKfycbz8gb2puQdi8fFgy2FF85PQkH9sg4eOHVC5oeDUn6VtIUPEb8UwjMbppyI33Qb5Rv2LPQ/exec";
-    let allMembers = []; // 서버에서 가져온 전체 데이터를 담는 배열
+    let allMembers = [];
 
-    // 1. 페이지 로드 시 이름 목록 읽어오기
     async function loadMembers() {
-        try {
-            const response = await fetch(API_URL);
-            allMembers = await response.json();
-            displayMembers(allMembers);
-            document.getElementById('loading').style.display = 'none';
-        } catch (e) {
-            alert("데이터를 불러오는데 실패했습니다.");
-        }
+        const response = await fetch(API_URL);
+        allMembers = await response.json();
+        displayMembers(allMembers);
+        document.getElementById('loading').style.display = 'none';
     }
 
-    // 2. 이름 목록 렌더링
     function displayMembers(members) {
         const listEl = document.getElementById('memberList');
         listEl.innerHTML = members.map(m => `
-            <li class="member-item">
+            <li class="member-item" onclick="openModal('update', '${m.id}', '${m.name}', '${m.email}')">
                 <div class="member-info">
                     <span class="member-name">${m.name}</span>
                     <span class="member-email">${m.email}</span>
@@ -88,49 +86,75 @@
         `).join('');
     }
 
-    // 3. 실시간 이름 검색 (근접한 회원 추려내기)
     function filterMembers() {
         const keyword = document.getElementById('searchInput').value.toLowerCase();
         const filtered = allMembers.filter(m => m.name.toLowerCase().includes(keyword));
         displayMembers(filtered);
     }
 
-    // 4. 모달 제어
-    function openModal() { document.getElementById('addModal').style.display = 'flex'; }
-    function closeModal() { 
-        document.getElementById('addModal').style.display = 'none';
-        document.getElementById('newName').value = '';
-        document.getElementById('newEmail').value = '';
-    }
+    // 모달 열기 (모드에 따라 UI 변경)
+    function openModal(mode, id = '', name = '', email = '') {
+        const modal = document.getElementById('memberModal');
+        const title = document.getElementById('modalTitle');
+        const saveBtn = document.getElementById('saveBtn');
+        const deleteBtn = document.getElementById('deleteBtn');
+        const searchInputVal = document.getElementById('searchInput').value;
 
-    // 5. 회원 추가 (App Script로 전송)
-    async function saveMember() {
-        const name = document.getElementById('newName').value;
-        const email = document.getElementById('newEmail').value;
+        document.getElementById('targetId').value = id;
+        document.getElementById('newName').value = name || (mode === 'create' ? searchInputVal : '');
+        document.getElementById('newEmail').value = email;
 
-        if(!name || !email) return alert("이름과 이메일을 입력해주세요.");
-
-        const btnSave = document.querySelector('.btn-save');
-        btnSave.innerText = "저장 중...";
-        btnSave.disabled = true;
-
-        const response = await fetch(API_URL, {
-            method: 'POST',
-            body: JSON.stringify({ action: 'create', name: name, email: email })
-        });
-
-        if(response.ok) {
-            alert("추가되었습니다.");
-            closeModal();
-            loadMembers(); // 목록 새로고침
+        if (mode === 'create') {
+            title.innerText = "새 회원 등록";
+            saveBtn.innerText = "추가";
+            saveBtn.onclick = () => sendData('create');
+            deleteBtn.style.display = "none";
+        } else {
+            title.innerText = "회원 정보 수정";
+            saveBtn.innerText = "수정";
+            saveBtn.onclick = () => sendData('update');
+            deleteBtn.style.display = "block";
         }
-        btnSave.innerText = "추가";
-        btnSave.disabled = false;
+
+        modal.style.display = 'flex';
+        // 이름이 있으면 이메일에 포커스, 없으면 이름에 포커스
+        document.getElementById(document.getElementById('newName').value ? 'newEmail' : 'newName').focus();
     }
 
-    // 초기 로딩 실행
-    loadMembers();
-</script>
+    function closeModal() {
+        document.getElementById('memberModal').style.display = 'none';
+    }
 
+    // 데이터 전송 처리 (추가/수정/삭제 통합)
+    async function sendData(action) {
+        if (action === 'delete' && !confirm("정말 삭제하시겠습니까?")) return;
+
+        const payload = {
+            action: action,
+            id: document.getElementById('targetId').value,
+            name: document.getElementById('newName').value,
+            email: document.getElementById('newEmail').value
+        };
+
+        const btn = event.target;
+        const originalText = btn.innerText;
+        btn.innerText = "처리 중...";
+        btn.disabled = true;
+
+        try {
+            const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) });
+            alert(await res.text());
+            closeModal();
+            loadMembers();
+        } catch (e) {
+            alert("통신 오류가 발생했습니다.");
+        } finally {
+            btn.innerText = originalText;
+            btn.disabled = false;
+        }
+    }
+
+    window.onload = loadMembers;
+</script>
 </body>
 </html>
