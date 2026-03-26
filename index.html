@@ -1,0 +1,42 @@
+function doGet(e) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  const data = sheet.getDataRange().getValues();
+  
+  // 첫 번째 행(헤더)을 제외한 데이터만 추출
+  const rows = data.slice(1).map(row => ({
+    id: row[0],
+    name: row[1],
+    email: row[2]
+  }));
+
+  // JSON 형태로 반환
+  return ContentService.createTextOutput(JSON.stringify(rows))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+// doPost 함수는 이전과 동일하게 유지 (생성, 수정, 삭제 처리)
+function doPost(e) {
+  const params = JSON.parse(e.postData.contents);
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  const data = sheet.getDataRange().getValues();
+  const action = params.action;
+
+  if (action === 'create') {
+    sheet.appendRow([Date.now().toString(), params.name, params.email]);
+    return ContentService.createTextOutput("추가 성공");
+  }
+
+  // 수정 및 삭제 로직
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0].toString() === params.id.toString()) {
+      if (action === 'update') {
+        sheet.getRange(i + 1, 2, 1, 2).setValues([[params.name, params.email]]);
+        return ContentService.createTextOutput("수정 성공");
+      } else if (action === 'delete') {
+        sheet.deleteRow(i + 1);
+        return ContentService.createTextOutput("삭제 성공");
+      }
+    }
+  }
+  return ContentService.createTextOutput("ID를 찾을 수 없음");
+}
